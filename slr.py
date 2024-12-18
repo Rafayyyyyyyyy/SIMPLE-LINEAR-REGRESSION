@@ -1,47 +1,65 @@
 import streamlit as st
-import numpy as np
 import pandas as pd
-import joblib
-from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error, r2_score
 
-# Title of the app
-st.title("Simple Linear Regression with Streamlit")
+# Streamlit UI
+st.title("Simple Linear Regression (SLR) with CSV Upload")
 
-# Create a synthetic dataset (you can replace this with your CSV file)
-# Generate some sample data for 'x' and 'y'
-np.random.seed(42)
-x = np.random.uniform(-10, 10, 100)  # 100 random values for 'x'
-y = 3 * x + 7 + np.random.normal(0, 2, 100)  # y = 3x + 7 with some noise
+# File uploader for CSV
+uploaded_file = st.file_uploader("Upload a CSV file", type=["csv"])
 
-# Convert to DataFrame
-data = pd.DataFrame({'x': x, 'y': y})
+if uploaded_file is not None:
+    # Read the CSV file into a pandas dataframe
+    df = pd.read_csv(uploaded_file)
 
-# Show some data in the app
-st.write("Sample Data", data.head())
+    # Display the dataframe
+    st.subheader("Dataset")
+    st.write(df.head())
 
-# Train-test split (80% train, 20% test)
-X = data[['x']]  # Independent variable
-y = data['y']    # Dependent variable
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    # Select the feature and label from the dataframe
+    features = st.selectbox("Select the feature (X)", df.columns)
+    label = st.selectbox("Select the label (Y)", df.columns)
 
-# Train the linear regression model
-model = LinearRegression()
-model.fit(X_train, y_train)
+    # Ensure the feature and label are not the same
+    if features != label:
+        if st.button("Train Model"):
+            # Split the dataset into train and test
+            X = df[[features]]  # Feature should be a 2D array
+            y = df[label]       # Label is a 1D array
 
-# Save the trained model to a file (this will be uploaded to GitHub)
-joblib.dump(model, 'linear_regression_model.pkl')
+            # Check if there are missing values in the selected columns
+            if X.isnull().sum().any() or y.isnull().sum() > 0:
+                st.error("The dataset contains missing values. Please clean the data.")
+            else:
+                # Split into training and testing sets
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Predict on the test set (optional)
-y_pred = model.predict(X_test)
-mse = mean_squared_error(y_test, y_pred)
-st.write(f"Mean Squared Error on test data: {mse:.2f}")
+                # Create a Linear Regression model
+                model = LinearRegression()
+                model.fit(X_train, y_train)
 
-# User input for prediction
-x_input = st.number_input("Enter value of x:", min_value=-10.0, max_value=10.0, value=0.0)
+                # Make predictions
+                y_pred = model.predict(X_test)
 
-# Make prediction when the button is clicked
-if st.button("Predict"):
-    prediction = model.predict(np.array([[x_input]]))
-    st.write(f"Predicted value of y: {prediction[0]:.2f}")
+                # Display results
+                st.subheader("Model Results")
+                st.write(f"Mean Squared Error: {mean_squared_error(y_test, y_pred)}")
+                st.write(f"R-squared: {r2_score(y_test, y_pred)}")
+
+                # Plot the regression line
+                plt.figure(figsize=(10, 6))
+                plt.scatter(X_test, y_test, color="blue", label="Actual")
+                plt.plot(X_test, y_pred, color="red", label="Predicted")
+                plt.xlabel(features)
+                plt.ylabel(label)
+                plt.title(f"{features} vs {label}")
+                plt.legend()
+                st.pyplot(plt)
+    else:
+        st.error("Feature and label cannot be the same. Please select different columns.")
+
+else:
+    st.warning("Please upload a CSV file to get started.")
